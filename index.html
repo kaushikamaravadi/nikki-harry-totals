@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>RSVP totals</title>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600&family=Jost:wght@400&display=swap" rel="stylesheet">
+<style>
+:root{--brown:#4A2A14;--muted:#7A5C3A;--cream:#F7F2E7}
+*{box-sizing:border-box;margin:0}
+body{background:var(--cream);min-height:100vh;color:var(--brown);font-family:'Cormorant Garamond',Georgia,serif;font-weight:500;font-size:1.15rem;padding:36px 18px 60px}
+.wrap{max-width:780px;margin:auto}
+h1{font-weight:500;font-size:2.4rem;text-align:center;letter-spacing:.02em}
+.sub{text-align:center;color:var(--muted);margin-bottom:24px}
+.lab{font-family:'Jost',sans-serif;font-size:.7rem;letter-spacing:.25em;text-transform:uppercase;color:var(--muted)}
+.card{background:#fff;padding:22px;margin-bottom:18px;border:1px solid rgba(74,42,20,.2)}
+input{width:100%;padding:11px 2px;border:0;border-bottom:1px solid var(--brown);font:inherit;font-size:1.1rem;background:transparent;margin:6px 0 16px}
+button{background:var(--brown);color:#FFF8EC;border:1px solid var(--brown);padding:12px 26px;font-family:'Jost',sans-serif;font-size:.74rem;letter-spacing:.26em;text-transform:uppercase;cursor:pointer}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:14px;margin-bottom:18px}
+.stat{background:#fff;padding:18px 8px;text-align:center;border-top:3px solid #B8862D;border-left:1px solid rgba(74,42,20,.12);border-right:1px solid rgba(74,42,20,.12);border-bottom:1px solid rgba(74,42,20,.12)}
+.stat b{display:block;font-size:2.5rem;line-height:1.1}
+.stat.big{background:var(--brown);color:#FFF8EC}.stat.big .lab{color:#e8d9c4}
+.stat.blue{border-top-color:#4A74C0}.stat.pink{border-top-color:#C9577F}
+table{width:100%;border-collapse:collapse;font-size:1.05rem;min-width:560px}
+th{font-family:'Jost',sans-serif;font-size:.66rem;letter-spacing:.2em;text-transform:uppercase;color:var(--muted);text-align:left;padding:8px 6px;border-bottom:1px solid var(--brown)}
+td{padding:9px 6px;border-bottom:1px solid rgba(74,42,20,.12);vertical-align:top}
+.no{color:var(--muted)}.msg{font-style:italic;color:var(--muted);font-size:1rem}
+.tbl{overflow-x:auto}.err{color:#9b2c2c;margin-top:10px}
+#out{display:none}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>RSVP totals</h1>
+  <p class="sub">Nikki &amp; Harry · private view</p>
+
+  <div class="card" id="login">
+    <span class="lab">Your private key</span>
+    <input type="password" id="key" placeholder="The VIEW_KEY you set in Netlify" autocomplete="off">
+    <button id="go">Show totals</button>
+    <p class="err" id="err"></p>
+  </div>
+
+  <div id="out">
+    <div class="grid" id="stats"></div>
+    <div class="card tbl"><table><thead><tr><th>Name</th><th>Email</th><th>Attending</th><th>Veg</th><th>Non-veg</th><th>Guess</th><th>Dietary</th></tr></thead><tbody id="rows"></tbody></table></div>
+    <div class="card" id="msgs"></div>
+    <p class="sub" id="note"></p>
+    <div style="text-align:center"><button id="refresh">Refresh now</button></div>
+  </div>
+</div>
+
+<script>
+const $=id=>document.getElementById(id);
+const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+let key='',timer;
+async function load(){
+  const r=await fetch('/.netlify/functions/totals?key='+encodeURIComponent(key),{cache:'no-store'});
+  let j={};try{j=await r.json()}catch(e){}
+  if(!r.ok)throw new Error(r.status===404&&!j.error?'The live totals function is not deployed yet.':(j.error||'Error '+r.status));
+  render(j);
+}
+function render(j){
+  const d=j.guests,yes=d.filter(x=>x.attending),no=d.length-yes.length;
+  const veg=yes.reduce((s,x)=>s+x.veg,0),nv=yes.reduce((s,x)=>s+x.nonveg,0);
+  const L=x=>x.guess.toLowerCase();
+  const boy=d.filter(x=>['boy','blue'].includes(L(x))).length,girl=d.filter(x=>['girl','pink'].includes(L(x))).length;
+  $('stats').innerHTML=[['Guests replied',d.length],['Attending',yes.length],['Declined',no],['Veg meals',veg],['Non-veg meals',nv],['Total meals',veg+nv,'big'],['Team Boy',boy,'blue'],['Team Girl',girl,'pink']]
+    .map(([l,v,c])=>`<div class="stat ${c||''}"><b>${v}</b><span class="lab">${l}</span></div>`).join('');
+  $('rows').innerHTML=d.map(x=>`<tr><td>${esc(x.name)}</td><td class="no">${esc(x.email)}</td><td class="${x.attending?'':'no'}">${x.attending?'Yes':'No'}</td><td>${x.attending?x.veg:'–'}</td><td>${x.attending?x.nonveg:'–'}</td><td>${esc(x.guess)||'–'}</td><td class="no">${esc(x.dietary)}</td></tr>`).join('')||'<tr><td colspan="7" class="no">No replies yet.</td></tr>';
+  const ms=d.filter(x=>x.message);
+  $('msgs').innerHTML='<span class="lab">Messages</span>'+(ms.map(x=>`<p style="margin-top:12px"><b>${esc(x.name)}:</b> <span class="msg">${esc(x.message)}</span></p>`).join('')||'<p class="msg" style="margin-top:10px">No messages yet.</p>');
+  $('note').textContent=(j.submissions>d.length?`${j.submissions} submissions merged into ${d.length} guests. `:'')+'Updated '+new Date().toLocaleTimeString()+' · auto-refreshes every 5 minutes';
+  $('login').style.display='none';$('out').style.display='block';
+}
+async function start(k){
+  key=k;$('err').textContent='';
+  try{await load();try{sessionStorage.setItem('vk',key)}catch(e){}clearInterval(timer);timer=setInterval(()=>{if(!document.hidden)load().catch(()=>{})},300000)}
+  catch(e){$('err').textContent=e.message;$('login').style.display='block';$('out').style.display='none'}
+}
+$('refresh').onclick=async()=>{$('refresh').textContent='Refreshing...';try{await load()}catch(e){$('note').textContent=e.message}$('refresh').textContent='Refresh now'};
+$('go').onclick=()=>{const k=$('key').value.trim();if(k)start(k)};
+try{const k=sessionStorage.getItem('vk');if(k)start(k)}catch(e){}
+</script>
+</body>
+</html>
