@@ -2,7 +2,7 @@
 //   NETLIFY_TOKEN = your personal access token (read-only use)
 //   VIEW_KEY      = a private password only you know
 const API = 'https://api.netlify.com/api/v1';
-const SITE = process.env.SITE_DOMAIN || 'harikipari-gender-reveal.netlify.app';
+const SITE = process.env.SITE_DOMAIN;
 
 const json = (code, obj) => ({
   statusCode: code,
